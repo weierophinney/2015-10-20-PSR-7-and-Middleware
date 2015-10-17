@@ -1,0 +1,15 @@
+{
+  "name": "PHP Speaks HTTP?",
+  "icons": [
+    {
+      "src": "img/php-med-trans.png",
+      "sizes": "95x51",
+      "type": "image/png",
+      "density": "1.0"
+    }
+  ],
+  "start_url": "/2014-12-06-PHP_Speaks_Http/index.html",
+  "display": "standalone",
+  "orientation": "landscape"
+}
+
