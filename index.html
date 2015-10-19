@@ -52,727 +52,444 @@
       </section>
 
       <section>
-        <section>
-          <h1>PHP was built for the web</h1>
-        </section>
+        <h2>Terminology</h2>
 
-        <section>
-          <h2 class="nocaps">PHP targets<br>Common Gateway Interface<br>(CGI)</h2>
+        <ul>
+          <li class="fragment"><b>FIG</b> Framework Interop Group</li>
+          <li class="fragment"><b>PSR</b>: PHP Standards Recommendation</li>
+          <li class="fragment"><b>HTTP</b>: HyperText Transport Protocol</li>
+          <li class="fragment"><b>CGI</b>: Common Gateway Interface</li>
+          <li class="fragment"><b>SAPI</b>: Server API</li>
+        </ul>
 
-          <aside class="notes">
-            <p>At the time, you <em>always</em> used a dedicated web server,
-            and the way you delegated a request to a runtime script was via
-            CGI, which provided a common way to encapsulate server information.
-            You see this today in the <kbd>$_SERVER</kbd> superglobal, which
-            is largely a representation of what CGI can or would provide to the
-            script.</p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>But does it reflect how we use HTTP today?</h2>
-
+        <aside class="notes">
           <ul>
-            <li class="fragment">Non-form payloads: XML! JSON!</li>
-            <li class="fragment">APIs: PATCH! PUT! DELETE!</li>
-            <li class="fragment">Quality assurance: offline testing!</li>
+            <li>FIG exists to codify commonalities between frameworks, and thus
+              promote interoperability between them. With PSR-7, the upcoming
+              container-interop proposal, caching, and a few others in the
+              background, in many ways it's aim is to subvert and remove the
+              need for frameworks.</li>
+            <li>PSR comes from JSR, Java Standards Recommendation. It's also
+              similar to Python's PEP (Python Enhancement Proposals), though
+              it's at the userland, not core implementation level.</li>
           </ul>
-        </section>
+        </aside>
       </section>
 
       <section>
-        <section>
-          <h1>HTTP Primer</h1>
-        </section>
+        <h1>PSR-7</h1>
+        <h2>HTTP Message Interfaces</h2>
 
-        <section>
-          <h2>Request</h2>
+        <aside class="notes">
+          <ul>
+            <li>PSR-7 is a set of PHP interfaces modeling value objects that
+              mirror HTTP messages.</li>
+          </ul>
+        </aside>
+      </section>
 
-          <pre><code class="lang-http" data-trim>
-{REQUEST_METHOD} {REQUEST_URI} HTTP/{PROTOCOL_VERSION}
-Header: value
-Another-Header: value
+      <section>
+        <h1>Why?</h1>
+      </section>
+
+      <section>
+        <h2>Because PHP Doesn't</h2>
+      </section>
+
+      <section>
+        <h2>POST</h2>
+
+        <ul>
+          <li>Works for <code>application/x-www-form-urlencoded</code> and
+            <code>form/multipart</code> <b>only</b>…</li>
+          <li class="fragment">and only when submitted via POST.</li>
+        </ul>
+
+        <aside class="notes">
+          <ul>
+            <li>What about PUT and PATCH and DELETE?</li>
+            <li>What about JSON or XML?</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>HTTP Request Headers</h2>
+
+        <ul>
+          <li>Available as <code>$_SERVER</code> variables…</li>
+          <li class="fragment">but not all under the same prefix…</li>
+          <li class="fragment">and using a non-intuitive normalization.</li>
+        </ul>
+
+        <aside class="notes">
+          <ul>
+            <li>Most use the <code>HTTP_</code> previx, but for compatibility
+              with CGI, "CONTENT_*" headers do not.</li>
+            <li>All uppercase, underscore separated... when HTTP headers are
+              considered case insensitive, and typically use dash separation.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Request URI</h2>
+
+        <ul>
+          <li>Canonical source varies based on SAPI…</li>
+          <li class="fragment">and full URI requires investigating up to 9
+            CGI/SAPI variables!</li>
+        </ul>
+
+        <aside class="notes">
+          <ul>
+            <li>SCHEME, HTTP_X_FORWARDED_PROTO, HOST, SERVER_NAME, SERVER_ADDR,
+              REQUEST_URI, UNENCODED URL, HTTP_X_ORIGINAL_URL, and ORIG_PATH_INFO</li>
+            <li>This is, again, CGI's fault</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>File Uploads</h2>
+
+        <ul>
+          <li>PHP only automatically handles them on POST requests.</li>
+          <li class="fragment">And has a few funky issues with arrays of file
+            uploads…
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>File uploads (continued)</h2>
+
+        <p>Given <code>$files[0]</code> and <code>$files[1]</code>, you would
+          expect:</p>
+
+        <pre><code class="lang-php" data-trim>
+[
+    'files' => [
+        0 => [
+            'name' => 'file0.txt',
+            'type' => 'text/plain',
+            /* etc. */
+        ],
+        1 => [
+            'name' => 'file1.html',
+            'type' => 'text/html',
+            /* etc. */
+        ],
+    ],
+];
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>File uploads (still)</h2>
+
+        <p>But PHP gives you:</p>
+
+        <pre><code class="lang-php" data-trim>
+[
+    'files' => [
+        'name' => [
+            0 => 'file0.txt',
+            1 => 'file1.html',
+        ],
+        'type' => [
+            0 => 'text/plain,
+            1 => 'text/html',
+        ],
+        /* etc. */
+    ],
+];
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>Which is completely unintuitive</li>
+            <li>People don't know about this until they encounter it; the manual
+              doesn't make the difference clear.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Streams</h2>
+
+        <ul>
+          <li>PHP abstracts both input and output as streams</li>
+          <li class="fragment">but actively makes dealing with those streams
+            difficult.</li>
+        </ul>
+
+        <aside class="notes">
+          <ul>
+            <li>Before PHP 5.6, <code>php://input</code> was read-<b>ONCE</b>,
+              which could lead to unexpected issues if you tried reading more
+              than once.</li>
+            <li>Understanding output buffering is a black art, and requires
+              understanding a lot about how PHP works under the hood to get
+              right.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h1>Abstractions</h1>
+
+        <aside class="notes">
+          <ul>
+            <li>The upshot is that while PHP offers easily useful and consumed
+              abstractions via the superglobals, there's enough difficulty and
+              confusion that people feel the need to provide additional
+              abstractions.</li>
+            <li>Enter the frameworks!</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Every framework creates their own</h2>
+
+        <ul>
+          <li>Zend Framework</li>
+          <li>Symfony</li>
+          <li>Aura</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Even client applications!</h2>
+
+        <ul>
+          <li>Guzzle</li>
+          <li>Buzz</li>
+          <li>Requests</li>
+          <li>Zend\Http\Client</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Too many abstractions<br />==<br />Babel</h2>
+
+        <aside class="notes">
+          <ul>
+            <li>Too many abstractions means nobody speaks the same, and users
+              have to learn new abstractions anytime they pick up a new
+              framework or HTTP client library.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>HTTP Message abstractions should be a commodity</h2>
+
+        <aside class="notes">
+          <ul>
+            <li>You cannot currently switch from ZF to Symfony or Aura easily due
+              to the differences in abstractions, and the learning curve required to
+              pick up new abstractions.</li>
+            <li>The same is true for any HTTP client library.</li>
+            <li>Considering <b>the web</b> is the <em>lingua franca</em> of PHP,
+              shouldn't these be something we all share?</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Requests have a specification</h2>
+
+        <pre><code class="lang-http" data-trim>
+POST /path HTTP/1.1
+Host: example.com
+Accept: text/html
 
 Message body
-          </code></pre>
-        </section>
+        </code></pre>
 
-        <section>
-          <h2>Response</h2>
-
-          <pre><code class="lang-http" data-trim>
-HTTP/{PROTOCOL_VERSION} {STATUS_CODE} {REASON_PHRASE}
-Header: value
-Another-Header: value
-
-Message body
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>URI</h2>
-
-          <pre><code class="lang-http" data-trim>
-&lt;scheme&gt;://(&lt;user-info&gt;@)&lt;host&gt;(:&lt;port&gt;)(/&lt;path&gt;)(?&lt;query&gt;)
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>Query string arguments</h2>
-
-          <pre><code class="lang-http" data-trim>
-name=value&amp;name2=value2&amp;etc
-          </code></pre>
-        </section>
-      </section>
-
-      <section>
-        <section>
-          <h2>PHP's Role</h2>
-
+        <aside class="notes">
           <ul>
-            <li>Accept an incoming Request</li>
-            <li>Create and return a Response</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2>Request considerations</h2>
-
-          <ul>
-            <li class="fragment">We MAY need to act on the request method</li>
-            <li class="fragment">We MAY need to act on the request URI, including <em>query string arguments</em></li>
-            <li class="fragment">We MAY need to act on one or more headers</li>
-            <li class="fragment">We MAY need to parse the request message body</li>
-            <li class="fragment"><em>How do we interact with a request?</em></li>
-          </ul>
-        </section>
-
-        <section>
-          <h2>Response considerations</h2>
-
-          <ul>
-            <li class="fragment">We MAY need to set the status code</li>
-            <li class="fragment">We MAY need to specify one or more headers</li>
-            <li class="fragment">We MAY need to provide message body content</li>
-            <li class="fragment"><em>How do we create the response?</em></li>
-          </ul>
-        </section>
-      </section>
-
-      <section>
-        <section>
-          <h1>The Past</h1>
-
-          <h2 class="nocaps">PHP v2 &mdash; v4.0.6</h2>
-        </section>
-
-        <section>
-          <h1>Request</h1>
-        </section>
-
-        <section>
-          <h2>Protocol version and request method</h2>
-
-          <pre><code class="lang-php" data-trim>
-$version = $HTTP_SERVER_VARS['PROTOCOL_VERSION']
-$method  = $HTTP_SERVER_VARS['REQUEST_METHOD']
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>URL</h2>
-
-          <pre><code class="lang-php" data-trim>
-$url = $HTTP_SERVER_VARS['REQUEST_URI'];
-// except when it isn't...
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>URL sources</h2>
-
-          <ul>
-            <li><kbd>$HTTP_SERVER_VARS['SCHEME']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['HTTP_X_FORWARDED_PROTO']</kbd>?</li>
-            <li><kbd>$HTTP_SERVER_VARS['HOST']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['SERVER_NAME']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['SERVER_ADDR']</kbd>?</li>
-            <li><kbd>$HTTP_SERVER_VARS['REQUEST_URI']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['UNENCODED_URL']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['HTTP_X_ORIGINAL_URLSERVER_ADDR']</kbd> <strong><em>or</em></strong> <kbd>$HTTP_SERVER_VARS['ORIG_PATH_INFO']</kbd>?</li>
-          </ul>
-
-          <aside class="notes">
-            Lots of different pieces to consider: depending on the server you
-            use, or if you're behind a proxy, the scheme and protocol may be
-            more accurately obtained from other metadata, as will the host and
-            port. Similarly, the URI reported in REQUEST_URI may not be accurate
-            based on the server, whether or not rewriting occurred, etc -- and
-            because of this, you may want to pull the query string arguments
-            from $_SERVER instead of the request URI.
+            <li>Request line is the METHOD, a request target, which is usually
+              the path, and the HTTP protocol used </li>
+            <li>Then you have headers.</li>
+            <li>Then you have the message body, which can be empty.</li>
           </aside>
-        </section>
+          </ul>
+      </section>
+
+      <section>
+        <h2>Responses have a specification</h2>
+
+        <pre><code class="lang-http" data-trim>
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+<b>Success!</b>
+        </code></pre>
         
-        <section>
-          <h2>And...</h2>
-
+        <aside class="notes">
           <ul>
-            <li><kbd>$HTTP_SERVER_VARS</kbd> is only available in the global scope.</li>
+            <li>Status line is the HTTP protocol, status code, and optionally a
+              reason phrase (which HTTP/2 omits)</li>
+            <li>Then you have headers.</li>
+            <li>Then you have the message body, which can be empty.</li>
+            <li><em>The point is that the message formats are well-known and
+              well-specified; they should have built-in support in the language!</em></li>
           </ul>
-        </section>
-
-        <section>
-          <h2>Getting headers</h2>
-
-          <pre><code class="lang-php" data-trim>
-// Most headers, e.g. Accept:
-$accept = $HTTP_SERVER_VARS['HTTP_ACCEPT'];
-
-// Some headers, e.g. Content-Type:
-$contentType = $HTTP_SERVER_VARS['CONTENT_TYPE'];
-          </code></pre>
-
-          <aside class="notes">
-            In other words, an inconsistent mess, and totally unintuitive. But
-            we didn't care, because we rarely needed to access them.
-          </aside>
-        </section>
-
-        <section>
-          <h2>Slightly easier</h2>
-
-          If you used Apache:
-
-          <pre><code class="lang-php" data-trim>
-$headers = apache_request_headers();
-
-// or its alias
-
-$headers = getallheaders();
-
-$contentType = $headers['Content-Type'];
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <ul>
-            <li>Apache-only (until 4.3.3, when NSAPI support was added)</li>
-            <li>Some headers are not returned (<kbd>If-*</kbd>)</li>
-          </ul>
-
-          <aside class="notes">
-            Which means that while it's present, it's not a good cross-platform
-            solution.
-          </aside>
-        </section>
-
-        <section>
-          <h2 class="nocaps">Input: register_globals</h2>
-
-          <pre><code class="lang-php" data-trim>
-// Assume /foo?duck=goose
-echo $duck; // "goose"
-
-// Also works for POST: assume cat=dog
-echo $cat; // "dog"
-
-// And cookies: assume bird=bat
-echo $bird; // "bat"
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But what if...?</h2>
-
-          <pre><code class="lang-php" data-trim>
-// What if /foo?duck=goose
-// AND POST duck=bluebird
-// AND cookie duck=eagle ?
-echo $duck; // ?
-          </code></pre>
-        </section>
-
-        <section>
-          <h2 class="nocaps">Introducing variables_order</h2>
-
-          <pre><code class="lang-ini" data-trim>
-; Get -> Post -> Cookie
-variables_order = "EGPCS"
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>So...</h2>
-
-          <pre><code class="lang-php" data-trim>
-// What if /foo?duck=goose
-// AND POST duck=bluebird
-// AND cookie duck=eagle ?
-echo $duck; // "eagle"
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But I wanted POST!</h2>
-
-          And thus we have <kbd>$HTTP_POST_VARS</kbd>:
-
-          <pre><code class="lang-php" data-trim>
-$duck = $HTTP_POST_VARS['duck'];
-echo $duck; // "bluebird"
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>"Explicit" Access</h2>
-
-          <ul>
-            <li><kbd>$HTTP_GET_VARS</kbd>: Query string arguments</li>
-            <li><kbd>$HTTP_POST_VARS</kbd>: POST form-encoded data</li>
-            <li><kbd>$HTTP_COOKIE_VARS</kbd>: Cookies</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2>What about alternate message types?</h2>
-
-          <kbd>$HTTP_RAW_POST_DATA</kbd> to the rescue!
-
-          <pre><code class="lang-php" data-trim>
-$data = parse($HTTP_RAW_POST_DATA); // parse somehow...
-$profit($data);
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <ul>
-            <li class="fragment">Until 4.1, you had to enable <kbd>track_vars</kbd> for these to be visible!</li>
-            <li class="fragment">Only available in the global scope - not within functions/methods!</li>
-            <li class="fragment"><kbd>$HTTP_RAW_POST_DATA</kbd> will not be present for form-encoded data, unless <kbd>always_populate_raw_post_data</kbd> is enabled.</li>
-          </ul>
-        </section>
-
-        <section>
-          <h1>Response</h1>
-        </section>
-
-        <section>
-          <h2>Status Code/Reason Phrase</h2>
-
-          <pre><code class="lang-php" data-trim>
-header('HTTP/1.0 404 Not Found'); // Send a status line
-header('Location: /foo'); // Implicit 302
-header('Location: /foo', true, 301); // Status code as argument
-          </code></pre>
-
-          <aside class="notes">
-            Easy-peasy. In the second case, PHP supplies the default IANA reason
-            phrase.  That said... why is this via header()? Why not a dedicated
-            function?!?!?!
-          </aside>
-        </section>
-
-        <section>
-          <h2>Headers</h2>
-
-          <pre><code class="lang-php" data-trim>
-header('X-Foo: Bar');
-header('X-Foo: Baz', false); // Emit an additional header
-header('X-Foo: Bat');        // Replace any previous values
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <kbd>echo()</kbd>, <kbd>print()</kbd>, or emit anything to the output
-          buffer, and no more headers can be sent!
-        </section>
-
-        <section>
-          <h2>Message bodies</h2>
-
-          <pre><code class="lang-php" data-trim>
-echo "Foo!";
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>HTML is easy!</h2>
-
-          Just mix it in with your PHP!
-          <pre><code class="lang-php" data-trim>
-&lt;?php
-$url  = 'http://http://www.phpconference.com.br/';
-$text = 'PHP Conference Brasil';
-?&gt;
-&lt;a href="&lt;?php echo $url ?&gt;"&gt;&lt;?php echo $text ?&gt;&lt;/a&gt;
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>Mixing headers and content</h2>
-
-          <ul>
-            <li>Aggregate body in variables</li>
-            <li>Or get comfortable with PHP's <kbd>ob*()</kbd> API...</li>
-          </ul>
-        </section>
+        </aside>
       </section>
 
       <section>
-        <h1>Ouch!</h1>
+        <h1>PSR-7: A history</h1>
       </section>
 
       <section>
-        <section>
-          <h1>The Present</h1>
+        <h2>Benjamin Eberlei</h2>
+        <h3>HTTP Client interfaces</h3>
+        <h4>March 2012</h4>
 
-          <h2 class="nocaps">PHP v4.1 &mdash; Now (5.6.3)</h2>
-        </section>
-
-        <section>
-          <h1>Request</h1>
-        </section>
-
-        <section>
-          <h2 class="nocaps">Goodbye, register_globals!</h2>
-
-          <aside class="notes">
-            Well, it's still there, but you can disable it, and later it's disabled by default.
-          </aside>
-        </section>
-
-        <section>
-          <h2>Superglobals</h2>
-
+        <aside class="notes">
           <ul>
-            <li>Available in <em>any</em> scope</li>
-            <li>Prefixed with an underscore</li>
-            <li><kbd>$_SERVER</kbd>: Server configuration, HTTP metadata, etc.</li>
-            <li><kbd>$_GET</kbd>: Query string arguments</li>
-            <li><kbd>$_POST</kbd>: Deserialized form-encoded POST data</li>
-            <li><kbd>$_COOKIE</kbd>: Cookie values</li>
-            <li><kbd>$_FILES</kbd>: Metadata on uploaded files</li>
+            <li>Essentially, Benjamin noticed that there was a lot of
+              commonality in how HTTP clients did their work, and felt that
+              could be abstracted, making it simpler to swap out clients based
+              on capabilities (such as ability to work with certain adapters,
+              use TLS vs SSL, etc.)</li>
           </ul>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <ul>
-            <li class="fragment"><kbd>$_SERVER</kbd> is still in the same format.</li>
-            <li class="fragment">Testing + superglobals == recipe for disaster.</li>
-            <li class="fragment">Superglobals are <em>mutable</em>.</li>
-          </ul>
-
-          <aside class="notes">
-            Essentially, while this was a nice move, it meant coupling between
-            superglobals and userland code. In a way, it was a step back,
-            because now instead of passing in the POST and GET values into our
-            applications, we fetch them -- which would be fine if they were
-            immutable, but they are <em>not</em>.
-          </aside>
-        </section>
-
-        <section>
-          <h2 class="nocaps">$_REQUEST</h2>
-
-          <ul>
-            <li>Merges GET, POST, and Cookie variables, according to <kbd>variables_order</kbd> or <kbd>request_order_string</kbd>.</li>
-          </ul>
-
-          <p>&nbsp;</p>
-
-          <h3 class="fragment">Just. <span class="fragment">Don't.</span></h3>
-        </section>
-
-        <section>
-          <h2>Message Bodies</h2>
-
-          <h4 class="nocaps">php://input</h4>
-
-          <ul>
-            <li class="fragment">Always available</li>
-            <li class="fragment">Read-only</li>
-            <li class="fragment">Uses streams: more performant, less memory intensive.</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <ul>
-            <li>Read-<em>once</em> until 5.6</li>
-          </ul>
-
-          <aside class="notes">
-            Why does that matter? Well, if you have multiple handlers that try
-            and read it, that means you have to cache it between reads -- which
-            adds to memory usage, and can be brittle if you forget.
-          </aside>
-        </section>
-
-        <section>
-          <h2>File Uploads</h2>
-
-          <h4 class="nocaps">$_FILES</h4>
-
-          <pre><code class="lang-php" data-trim>
-array(
-  'element_name' => array(
-      'tmp_name' => 'path where PHP uploaded it',
-      'name'     => 'filename as presented by client',
-      'size'     => 'file size as presented by client',
-      'type'     => 'file MIME-type as presented by client',
-      'error'    => 'appropriate UPLOAD_ERR_* code',
-  ),
-)
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>But...</h2>
-
-          <h4 class="nocaps">Arrays of files (<kbd>upload[0]</kbd>) are treated weird</h4>
-
-          <pre><code class="lang-php" data-trim>
-array(
-  'element_name' => array(
-      'tmp_name' => array( /* key for each element */ ),
-      'name'     => array( /* key for each element */ ),
-      'size'     => array( /* key for each element */ ),
-      'type'     => array( /* key for each element */ ),
-      'error'    => array( /* key for each element */ ),
-  ),
-)
-          </code></pre>
-
-          <aside class="notes">
-            In other words, you cannot grab the details for a given nested
-            filename using standard array dereferencing; you have to assemble
-            its details <b>manually</b>.
-          </aside>
-        </section>
-
-        <section>
-          <h1>Response</h1>
-        </section>
-
-        <section>
-          <h2>Nothing changes</h2>
-
-          <aside class="notes">
-            We're stuck with lack of a way to set the status line other than
-            with <kbd>header()</kbd>, and fiddling with output buffering. Fortunately, the
-            frameworks that start to sprout up in the later versions of PHP4 and
-            in PHP5 help us abstract that away... mostly in completely different
-            ways.
-          </aside>
-        </section>
+        </aside>
       </section>
 
       <section>
-        <h1>Argh!</h1>
+        <h2>Chris Wilkinson</h2>
+        <h3>HTTP Message Interfaces</h3>
+        <h4>December 2012</h4>
+
+        <aside class="notes">
+          <ul>
+            <li>Chris noted that discussion around the HTTP client interfaces
+              had reached the conclusion that they were reliant on having robust
+              HTTP Message interface specifications in place first, and proposed
+              a set of interfaces around that.</li>
+            <li>One other item noted was that these could be useful for
+              server-side applications as well.</li>
+          </ul>
+        </aside>
       </section>
 
       <section>
-        <section>
-          <h1>How do other languages hold up?</h1>
-        </section>
+        <h2>Michael Dowling</h2>
+        <h3>HTTP Mesage Interfaces: Draft</h3>
+        <h4>January 2014</h4>
 
-        <section>
-          <h2>Python: WSGI</h2>
-        </section>
-
-        <section>
-          <h2>WSGI: environ</h2>
-
+        <aside class="notes">
           <ul>
-            <li>Encapsulates the request method, URI information, and headers.</li>
-            <li>Body is a stream.</li>
+            <li>Over a year later, Michael Dowling, of Guzzle fame, published
+              the first draft of HTTP Message Interfaces, acting ast the Editor
+              for the PSR.</li>
+            <li>Due to his background with Guzzle, these were primarily
+              targeting client-side applications.</li>
+            <li>Headers were treated as a part of a message, not as a separate
+              object; the argument was that the spec indicates headers define
+              the value of a message.</li>
+            <li>Message bodies were treated as <em>streams</em>; this was
+              revolutionary, as it ensures that usage between implementations
+              must be the same, and using streams is no longer an optional
+              optimization.</li>
           </ul>
+        </aside>
+      </section>
 
-          <pre><code class="lang-python" data-trim>
-path = environ.get("PATH_INFO", "")
-query = parse_qs(environ.get("QUERY_STRING", ""))
-accept = environ.get("HTTP_ACCEPT", "text/html")
-content_length = int(environ.get("CONTENT_LENGTH", 0))
-body = environ["wsgi.input"].read(content_length)
-          </code></pre>
+      <section>
+        <h2>Michael Dowling</h2>
+        <h3>HTTP Mesage Interfaces: Redacted</h3>
+        <h4>August 2014</h4>
 
-          <aside class="notes">
+        <aside class="notes">
+          <ul>
+            <li>The tyranny of the masses got to Michael, and he felt the
+              constant argumentation was preventing forward momentum.</li>
+            <li>Regardless, he planned to continue modeling Guzzle on the latest
+              version of the draft.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Matthew Weier O'Phinney</h2>
+        <h3>HTTP Mesage Interfaces: Draft</h3>
+        <h4>September 2014</h4>
+
+        <aside class="notes">
+          <ul>
+            <li>My team had just finished a prototype of Apigility in Node.js</li>
+            <li>I had ported Sencha Connect to PHP, and, in doing so, chosen to
+              target PSR-7 — which had required creating a PSR-7 implementation.</li>
+            <li>I was interested in the server-side ramifications.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Additions to interfaces</h2>
+
+        <ul>
+          <li><code>ServerRequestInterface</code> to handle:
             <ul>
-              <li>WSGI == Web Server Gateway Interface</li>
-              <li>Most of environ resembles $_SERVER in PHP -- basically, CGI</li>
+              <li>PHP superglobal-type request parameters</li>
+              <li>common concerns such as routing parameters</li>
+              <li>message body parameter abstraction</li>
             </ul>
-          </aside>
-        </section>
+          </li>
+          <li class="fragment"><code>UriInterface</code> to model the URI.</li>
+          <li class="fragment"><code>UploadedFileInterface</code> to model file
+            uploads.</li>
+          <li class="fragment">Immutable <em>value objects</em></li>
+        </ul>
 
-        <section>
-          <h2 class="nocaps">WSGI: start_response</h2>
-
+        <aside class="notes">
           <ul>
-            <li>Encapsulates status and headers.</li>
-            <li>Body is a stream.</li>
+            <li>Thank Larry Garfield for his assistance with the UriInterface</li>
+            <li>Thank Bernard Shussek for his contribution of the
+              UploadedFileInterface</li>
+            <li>We'd been modeling them as value objects, but decided to take
+              this to the logic conclusion of immutability.</li>
           </ul>
-
-          <pre><code class="lang-python" data-trim>
-headers = [("Content-Type", "application/json",
-  ("X-Foo", "Bar")]
-start_response("200 OK", headers)
-return stream_representing_body
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>Ruby: Rack</h2>
-        </section>
-
-        <section>
-          <h2 class="nocaps">Rack: env + Request</h2>
-
-          <ul>
-            <li>Encapsulates the request method, URI information, and headers.</li>
-            <li>Body is a stream.</li>
-          </ul>
-
-          <pre><code class="lang-ruby" data-trim>
-request = Rack::Request.new env
-uri = request.url
-accept = request.env['HTTP_ACCEPT']
-data = JSON.parse( request.body.read )
-          </code></pre>
-
-          <aside class="notes">
-            <p>
-              Sadly, header access is mostly through env still -- i.e. CGI. Some
-              headers have shortcut methods/variables, but it's only a small
-              subset.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2 class="multi">Rack: Response</h2>
-
-          <ul>
-            <li>Encapsulates status and headers.</li>
-            <li>Body is iterable.</li>
-          </ul>
-
-          <pre><code class="lang-ruby" data-trim>
-response = Rack::Response.new
-response.status = 200
-response['Content-Type'] = 'application/json'
-response.write '{"message": "Content for message"}'
-response.finish
-          </code></pre>
-        </section>
-
-        <section>
-          <h2>Node</h2>
-        </section>
-
-        <section>
-          <h2 class="nocaps">http.IncomingMessage</h2>
-
-          <ul>
-            <li>Encapsulates the request method, URL, and headers.</li>
-            <li>Body is a stream.</li>
-          </ul>
-
-          <pre><code class="lang-javascipt" data-trim>
-var method = req.method;
-var path = require('url').parse(req.url).pathname;
-var query = require('url').parse(req.url, true).query;
-var accept = req.headers.accept;
-var body;
-req.on('data', function(chunk) { body += chunk.toString(); });
-req.on('end', function() { body = JSON.parse(body); });
-          </code></pre>
-
-          <aside class="notes">
-            <p>
-              Finally, real header abstraction! And the CGI crap is GONE!
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2 class="nocaps multi">http.ServerResponse</h2>
-
-          <ul>
-            <li>Encapsulates status and headers.</li>
-            <li>Body is a stream.</li>
-          </ul>
-
-          <pre><code class="lang-javascipt" data-trim>
-res.statusCode = 200;
-res.writeHead(200, 'OK!');
-res.setHeader('Content-Type', 'application/json');
-res.write('{"message": "Message for the body"}');
-res.end();
-          </code></pre>
-
-          <aside class="notes">
-            <p>
-              It's kind of like they took the best ideas from WSGI and Rack, and
-              improved on them.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>Commonalities</h2>
-
-          <ul>
-            <li class="fragment">Standard access to the request URI</li>
-            <li class="fragment">Standard access to request headers</li>
-            <li class="fragment">Standard way to provide response status</li>
-            <li class="fragment">Standard way to provide response headers</li>
-            <li class="fragment">Message bodies are treated as streams/iterators</li>
-          </ul>
-        </section>
-
-        <section>
-          <h3 class="nocaps">Users of these languages have<br><em>HTTP message</em> abstractions</h3>
-        </section>
-
-        <section>
-          <h1 class="nooffset">If Python, Ruby, and Node can solve this problem, why can't PHP?</h1>
-        </section>
+        </aside>
       </section>
 
       <section>
-        <h1>The Future</h1>
+        <h2>Relationships</h2>
+
+        <p><img src="img/interface-relationships.png" alt="PSR-7 Interface relationships" /></p>
       </section>
 
       <section>
-        <section>
-          <h2>Framework Interop Group<br>(FIG)</h2>
+        <h2>Acceptance: 18 May 2015</h2>
+      </section>
 
-          <p>Promote reuse of code across projects,<br>
-            via "standards recommendations":</p>
+      <section>
+        <h1>Examples</h1>
+      </section>
 
-          <ul>
-            <li class="fragment">Autoloading</li>
-            <li class="fragment">Shared, independent coding standards</li>
-            <li class="fragment">Logging</li>
-            <li class="fragment">and more to come...</li>
-          </ul>
-        </section>
+      <section>
+        <h2>All Messages</h2>
 
-        <section>
-          <h1>PSR-7</h1>
+        <pre><code class="lang-php" data-trim>
+$headerValues = $message->getHeader('Cookie');     // array!
+$headerLine   = $message->getHeaderLine('Accept'); // string!
+$headers      = $message->getHeaders(); // string => array pairs
+$body         = $message->getBody();    // StreamInterface
+$message      = $message->withHeader('Foo', 'Bar');
+$message      = $message->withBody($stream);
+        </code></pre>
+      </section>
 
-          <h3>HTTP Message Interfaces</h3>
-        </section>
+      <section>
+        <h2>RequestInterface — Clients</h2>
 
-        <section>
-          <h2>RequestInterface</h2>
-
-          <pre><code class="lang-php" data-trim>
+        <pre><code class="lang-php" data-trim>
 $body = new Stream();
 $stream->write('{"foo":"bar"}');
 $request = (new Request())
@@ -780,135 +497,306 @@ $request = (new Request())
     ->withUri(new Uri('https://api.example.com/'))
     ->withHeader('Accept', 'application/json')
     ->withBody($stream);
-          </code></pre>
+        </code></pre>
 
-          <aside class="notes">
-            <p>
-              This is how you'd create a request -- which will be primarily useful
-              for clients.
-            </p>
-          </aside>
-        </section>
+        <aside class="notes">
+          <p>
+            This is how you'd create a request — which will be primarily useful
+            for clients.
+          </p>
+        </aside>
+      </section>
 
-        <section>
-          <h2>ServerRequestInterface</h2>
+      <section>
+        <h2>UriInterface</h2>
 
-          <pre><code class="lang-php" data-trim>
+        <pre><code class="lang-php" data-trim>
+$scheme   = $uri->getScheme();
+$userInfo = $uri->getUserInfo();
+$host     = $uri->getHost();
+$port     = $uri->getPort();
+$path     = $uri->getPath();
+$query    = $uri->getQuery();
+$fragment = $uri->getFragment();
+$uri      = $uri->withHost('example.com');
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>ResponseInterface — Clients</h2>
+
+        <pre><code class="lang-php" data-trim>
+$status      = $response->getStatusCode();
+$reason      = $response->getReasonPhrase();
+$contentType = $response->getHeader('Content-Type');
+$data        = json_decode((string) $response->getBody());
+        </code></pre>
+
+        <aside class="notes">
+          <p>
+            And on the flip side, if I want to consume a response, I have a
+            similar OOP interface -- in fact, it mirrors that of requests for
+            items like headers and the body.
+          </p>
+        </aside>
+      </section>
+
+      <section>
+        <h2>ServerRequestInterface</h2>
+
+        <pre><code class="lang-php" data-trim>
 $request = ServerRequestFactory::fromGlobals();
 $method  = $request->getMethod();
 $path    = $request->getUri()->getPath();
-$accept  = $request->getHeader('Accept');
+$accept  = $request->getHeaderLine('Accept');
 $data    = json_decode((string) $request->getBody());
+// $request = $request->withParsedBody($data);
+// $params  = $request->getParsedBody();
 $query   = $request->getQueryParams();
 $cookies = $request->getCookieParams();
-$files   = $request->getFileParams();
-          </code></pre>
+$files   = $request->getUploadedFiles();
+        </code></pre>
 
-          <aside class="notes">
-            <p>
-              Consuming a request is similar to creating it - you have access to
-              every request member. For server-side requests, you also get access
-              to values usually in superglobals, such as $_GET, $_COOKIE, etc.
-            </p>
+        <aside class="notes">
+          <p>
+            Consuming a request is similar to creating it - you have access to
+            every request member. For server-side requests, you also get access
+            to values usually in superglobals, such as $_GET, $_COOKIE, etc.
+          </p>
 
-            <p>
-              Note that URI abstraction is also included - you don't need to
-              parse the URI to get at the various segments.
-            </p>
-          </aside>
-        </section>
+          <p>
+            Note that URI abstraction is also included - you don't need to
+            parse the URI to get at the various segments.
+          </p>
+        </aside>
+      </section>
 
-        <section>
-          <h2>ResponseInterface</h2>
+      <section>
+        <h2>ServerRequestInterface — Attributes</h2>
 
-          <pre><code class="lang-php" data-trim>
+        <p>Problem: how do we represent parameters matched by routing?</p>
+
+        <pre><code class="lang-php" data-trim>
+foreach ($matchedParams as $key => $value) {
+    $request = $request->withAttribute($key, $value);
+}
+// Later:
+$id = $request->getAttribute('id', 1);
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>This was one place where we invented something, because every
+              framework routes, but they vary in how those matches are
+              propagated through the application.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Uploaded Files</h2>
+
+        <pre><code class="lang-php" data-trim>
+$size   = $file->getSize();
+$error  = $file->getError(); // PHP file upload error constant
+$name   = $file->getClientFilename();
+$type   = $file->getClientMediaType();
+$stream = $file->getStream(); // StreamInterface!
+$file->moveTo($targetPath);
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>moveTo() abstracts the operation of moving the file, which
+              allows the abstraction to be used in non-SAPI environments such as
+              ReactPHP!</li>
+            <li>Retrieving as a stream allows streaming a file upload somewhere,
+              such as S3, in a performant way that reduces memory usage.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>ResponseInterface</h2>
+
+        <pre><code class="lang-php" data-trim>
 $body = new Stream();
 $stream->write(json_encode(['foo' => 'bar']));
 $response = (new Response())
     ->withStatus(200, 'OK!')
     ->withHeader('Accept', 'application/json')
     ->withBody($stream);
-          </code></pre>
+        </code></pre>
 
-          <aside class="notes">
-            <p>
-              Creating a response allows you to set all aspects of the response,
-              from status to headers to the body.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>ResponseInterface</h2>
-
-          <pre><code class="lang-php" data-trim>
-$status      = $response->getStatusCode();
-$reason      = $response->getReasonPhrase();
-$contentType = $response->getHeader('Content-Type');
-$data        = json_decode((string) $response->getBody());
-          </code></pre>
-
-          <aside class="notes">
-            <p>
-              And on the flip side, if I want to consume a response, I have a
-              similar OOP interface -- in fact, it mirrors that of requests for
-              items like headers and the body.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>PSR-7 in a nutshell</h2>
-
-          <h4>Uniform access to HTTP messages</h4>
-
-          <aside class="notes">
-            Who cares? Why not just use one of the existing request/response
-            abstractions from an existing framework? Perfectly valid. It's what
-            having a uniform interface enables that's interesting.
-          </aside>
-        </section>
+        <aside class="notes">
+          <p>
+            Creating a response allows you to set all aspects of the response,
+            from status to headers to the body.
+          </p>
+        </aside>
       </section>
 
       <section>
-        <section>
-          <h1>An end to framework silos</h1>
+        <h2>PSR-7 in a nutshell</h2>
 
-          <aside class="notes">
-            We've all seen it: Symfony-specific bundles, ZF2-specific modules,
-            Laravel-specific packages. These mean that people are solving the
-            same problems over and over again, but wrapping them up as
-            framework-specific solutions. We need to stop that.
-          </aside>
-        </section>
+        <h4>Uniform access to HTTP messages</h4>
 
-        <section>
-          <h2 class="nocaps">Target PSR-7</h2>
+        <aside class="notes">
+          Who cares? Why not just use one of the existing request/response
+          abstractions from an existing framework? Perfectly valid. It's what
+          having a uniform interface enables that's interesting.
+        </aside>
+      </section>
 
-          <p>More specifically, start thinking in terms of <em>middleware</em>:</p>
+      <section>
+        <h1>Middleware</h1>
+      </section>
 
-          <pre><code class="lang-php" data-trim>
-use Psr\Http\Message\ServerRequestInterface as Request;
-use Psr\Http\Message\ResponseInterface as Response;
+      <section>
+        <h2>Middle what?</h2>
 
-$handler = function (Request $request, Response $response) {
-    // Grab input from the request
-    // Update the response
-};
-          </code></pre>
+        <p class="fragment"><img src="img/lambda.png" alt="StackPHP Kernel" /></p>
 
-          <aside class="notes">
-            If we all start writing code like this, we can share it broadly.
-            Developers can write and/or ship their framework-specific code that
-            consumes it - by just passing on the request/response pairs they
-            already have.
-          </aside>
-        </section>
+        <aside class="notes">
+          <ul>
+            <li>Middleware transforms a request into a response.</li>
+            <li>Typically used in server-side applications, but has been used
+              successfully in client-side as well; recent Guzzle versions make
+              extensive use of it.</li>
+            <li>Popularized by WSGI, Rack, and Node.</li>
+          </ul>
+        </aside>
+      </section>
 
-        <section>
-          <h3>Make frameworks consume middleware</h3>
+      <section>
+        <h2>Common Styles</h2>
+        <h4>Lambda</h4>
 
-          <pre><code class="lang-php" data-trim>
+        <pre><code class="lang-php" data-trim>
+function (ServerRequestInterface $request) : Response
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>This is a literal interpretation of the pattern.</li>
+            <li>Laravel 5 and Lumen use this pattern; StackPHP kind of does.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Common Styles</h2>
+        <h4>Injected Response</h4>
+
+        <pre><code class="lang-php" data-trim>
+function (
+    ServerRequestInterface $request,
+    ResponseInterface $response
+) : ResponseInterface
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>Passing the response means that <em>the consumer does not need to
+              depend on a concrete response</em>, but can depend on the abstraction.</li>
+            <li>This is what ZF2 uses via the DispatchableInterface.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Q: How do you accomplish complex behavior?</h2>
+
+        <p class="fragment">A: By composing middleware.</p>
+
+        <pre class="fragment"><code class="lang-php" data-trim>
+class ClacksOverhead
+{
+    public function __construct(callable $app) {
+        $this->app = $app;
+    }
+    public function __invoke($request, $response) {
+        $response = $this->app->__invoke($request, $response);
+        return $response->withHeader(
+            'X-Clacks-Overhead',
+            'GNU Terry Pratchett'
+        );
+    }
+}
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>Essentially, you can create complex behaviors by nesting
+              middleware. This requires that the middleware have a standard way
+              of injecting middleware, however…</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h2>Common Styles</h2>
+        <h4>Injected "Next" Middleware</h4>
+
+        <pre><code class="lang-php" data-trim>
+function (
+    ServerRequestInterface $request,
+    ResponseInterface $response,
+    callable $next
+) : ResponseInterface
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Invoking the "Next" middleware</h2>
+
+        <pre><code class="lang-php" data-trim>
+// route the request
+// and now inject it:
+foreach ($matches as $key => $value) {
+    $request = $request->withAttribute($key, $value);
+}
+return $next(
+    $request,
+    $response->withHeader(
+        'X-Clacks-Overhead',
+        'GNU Terry Pratchett'
+    )
+);
+        </code></pre>
+
+        <aside class="notes">
+          <ul>
+            <li>Instead of convention-based injection of middleware to nest,
+              it's now explicit; you call <code>$next()</code> if there's more
+              processing to do.</li>
+            <li><code>$next</code> is given the request and response to pass to
+              the next middleware. This is where immutability becomes very
+              interesting!</li>
+            <li>Used by Relay, Slim v3, Stratigility/Expressive.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section>
+        <h1>Why is middleware important?</h1>
+      </section>
+
+      <section>
+        <h1>An end to framework silos</h1>
+
+        <aside class="notes">
+          We've all seen it: Symfony-specific bundles, ZF2-specific modules,
+          Laravel-specific packages. These mean that people are solving the
+          same problems over and over again, but wrapping them up as
+          framework-specific solutions. We need to stop that.
+        </aside>
+      </section>
+
+      <section>
+        <h3>Make frameworks consume middleware</h3>
+
+        <pre><code class="lang-php" data-trim>
 class ContactController
 {
     private $contact;
@@ -922,102 +810,36 @@ class ContactController
         return call_user_func($this->contact, $req, $res);
     }
 }
-          </code></pre>
+        </code></pre>
 
-          <aside class="notes">
-            Hypothetical at this point, but demonstrates the idea: the framework
-            now consumes generic middleware. Theoretically, the framework could
-            simply route to generic middleware!
-          </aside>
-        </section>
+        <aside class="notes">
+          Hypothetical at this point, but demonstrates the idea: the framework
+          now consumes generic middleware. Theoretically, the framework could
+          simply route to generic middleware!
+        </aside>
       </section>
 
       <section>
-        <section>
-          <h2>What does this have to do with <em>performance</em>?</h2>
-        </section>
+        <h3>Wrap frameworks in middleware</h3>
 
-        <section>
-          <h2><em>Developer</em> Performance</h2>
+        <pre><code class="lang-php" data-trim>
+$app->pipe(function ($req, $res, $next) {
+    $framework = bootstrap_framework();
+    $response  = $framework->run(
+        convertRequestToFramework($req),
+        convertResponseToFramework($res),
+    );
+    return convertFrameworkResponse($response);
+});
+        </code></pre>
 
-          <aside class="notes">
-            <p>
-              Remember all those hacks necessary to work with PHP's native HTTP
-              support? You can forget all of those.
-            </p>
-
-            <p>
-              Additionally, you can drop the framework you're using, and target
-              PSR-7 instead, when you have performance considerations.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>Middleware</h2>
-
-          <aside class="notes">
-            <p>
-              Middleware can lead to performance. You can use or develop thinner
-              application layers for the HTTP aspects of your application.
-            </p>
-
-            <p>
-              But there are more and better considerations.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>Middleware in other languages</h2>
-
-          <h4>Because they don't have SAPIs…</h4>
-
-          <h4 class="fragment">they implement HTTP servers natively.</h4>
-
-          <aside class="notes">
-            <p>
-              When you look at Ruby, Python, and Node, they don't have an
-              equivalent of PHP's SAPI. Which means…
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>Middleware intercepts requests</h2>
-
-          <img src="img/event-loop.png" alt="Event Loop" />
-
-          <aside class="notes">
-            <p>
-              The servers typically implement an event loop, with each request
-              triggering a new event. The request is passed on to the
-              middleware.
-            </p>
-          </aside>
-        </section>
-
-        <section>
-          <h2>What if PHP could do this?</h2>
-
+        <aside class="notes">
           <ul>
-            <li class="fragment">No need for a 3rd party web server</li>
-            <li class="fragment">Scaling == firing up additional servers behind a proxy</li>
-            <li class="fragment">Potential for true async</li>
-            <li class="fragment">Preloading of applications!</li>
+            <li>Once you get here, you can mix and match code from frameworks,
+              letting each do what it does best, or…</li>
+            <li>migrate from frameworks to <em>middleware</em></li>
           </ul>
-
-          <aside class="notes">
-            <p>
-              Asynchronous processes would allow a single server to continue to
-              answer requests instead of blocking on one long-running request.
-            </p>
-          </aside>
-        </section>
-      </section>
-
-      <section>
-        <h1 class="nocaps">The future of HTTP in PHP is <em>fast</em></h1>
+        </aside>
       </section>
 
       <section>
