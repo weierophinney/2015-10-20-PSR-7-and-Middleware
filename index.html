@@ -491,7 +491,7 @@ $message      = $message->withBody($stream);
 
         <pre><code class="lang-php" data-trim>
 $body = new Stream();
-$stream->write('{"foo":"bar"}');
+$body->write('{"foo":"bar"}');
 $request = (new Request())
     ->withMethod('GET')
     ->withUri(new Uri('https://api.example.com/'))
@@ -621,7 +621,7 @@ $file->moveTo($targetPath);
 
         <pre><code class="lang-php" data-trim>
 $body = new Stream();
-$stream->write(json_encode(['foo' => 'bar']));
+$body->write(json_encode(['foo' => 'bar']));
 $response = (new Response())
     ->withStatus(200, 'OK!')
     ->withHeader('Accept', 'application/json')
